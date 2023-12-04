@@ -1,6 +1,12 @@
+import com.google.protobuf.gradle.id
+import org.jetbrains.kotlin.konan.properties.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("com.google.protobuf")
+    kotlin("kapt")
 }
 
 android {
@@ -28,16 +34,30 @@ android {
                 "proguard-rules.pro"
             )
         }
+        debug {
+            /**
+             * a username/password pair to login to the server
+             * for testing only; relies on the local credentials.properties, which should
+             * NOT be included in version control
+             */
+            val credentials = Properties().apply {
+                load(FileInputStream(File(rootDir, "credentials.properties")))
+            }
+
+            buildConfigField("String", "USERNAME", credentials.getProperty("USERNAME"))
+            buildConfigField("String", "PASSWORD", credentials.getProperty("PASSWORD"))
+        }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "17"
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.4.3"
@@ -45,6 +65,32 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+}
+
+val grpcVersion = "1.4.0"
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:3.3.0"
+    }
+    plugins {
+        id("javalite") {
+            artifact = "com.google.protobuf:protoc-gen-javalite:3.0.0"
+        }
+        id("grpc") {
+            artifact = "io.grpc:protoc-gen-grpc-java:${grpcVersion}"
+        }
+    }
+    generateProtoTasks {
+        all().forEach { task ->
+            task.plugins {
+                id("javalite")
+                id("grpc") {
+                    // Options added to --grpc_out
+                    option("lite")
+                }
+            }
         }
     }
 }
@@ -86,4 +132,16 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycleVersion")
     // Lifecycle utilities for Compose
     implementation("androidx.lifecycle:lifecycle-runtime-compose:$lifecycleVersion")
+
+    // Google
+    implementation("io.grpc:grpc-okhttp:1.32.2")
+    implementation("io.grpc:grpc-protobuf-lite:${grpcVersion}")
+    implementation("io.grpc:grpc-stub:${grpcVersion}")
+    implementation("javax.annotation:javax.annotation-api:1.2")
+    protobuf("com.google.protobuf:protobuf-java:3.4.0")
+
+    // OAuth2 for Google API
+    implementation("com.google.auth:google-auth-library-oauth2-http:0.7.0") {
+        exclude(module = "httpclient")
+    }
 }

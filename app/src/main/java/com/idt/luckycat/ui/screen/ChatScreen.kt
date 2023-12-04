@@ -39,8 +39,9 @@ fun ChatScreen(
     ChatScreenContent(
         uiState = uiState,
         onGetStatus = { viewModel.getRobotStatus() },
-        onSpeak = { viewModel.speakText() },
+        onTalk = { viewModel.onTalk() },
         navigateBack = navigateBack,
+        onReset = { viewModel.resetRobotStatus() }
     )
 }
 
@@ -49,8 +50,9 @@ fun ChatScreen(
 fun ChatScreenContent(
     uiState: ChatUiState,
     onGetStatus: () -> Unit = {},
-    onSpeak: () -> Unit = {},
+    onTalk: () -> Unit = {},
     navigateBack: () -> Unit = {},
+    onReset: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -82,14 +84,22 @@ fun ChatScreenContent(
 
             Spacer(modifier = Modifier.height(24.dp))
             Button(onClick = { onGetStatus() }) {
-                Text("Get Status")
+                Text("GET STATUS")
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-            Button(onClick = {
-                onSpeak()
-            }) {
-                Text("Speak!")
+            Button(
+                enabled = uiState.talkButtonEnabled,
+                onClick = { onTalk() }
+            ) {
+                Text("TALK!")
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+            Button(
+                onClick = { onReset() }
+            ) {
+                Text("RESET")
             }
         }
     }

@@ -16,3 +16,5 @@
 .externalNativeBuild
 .cxx
 local.properties
+stt_cred.json
+credentials.properties
