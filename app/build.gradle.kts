@@ -144,4 +144,36 @@ dependencies {
     implementation("com.google.auth:google-auth-library-oauth2-http:0.7.0") {
         exclude(module = "httpclient")
     }
+
+    // media 3
+    val media3Version = "1.2.1"
+
+    // For media playback using ExoPlayer
+    implementation("androidx.media3:media3-exoplayer:$media3Version")
+
+    // For RTSP playback support with ExoPlayer
+    implementation("androidx.media3:media3-exoplayer-rtsp:$media3Version")
+
+    // For building media playback UIs
+    implementation("androidx.media3:media3-ui:$media3Version")
+
+    // For exposing and controlling media sessions
+    implementation("androidx.media3:media3-session:$media3Version")
+
+    // For extracting data from media containers
+    implementation("androidx.media3:media3-extractor:$media3Version")
+
+    // Utilities for testing media components (including ExoPlayer components)
+    implementation("androidx.media3:media3-test-utils:$media3Version")
+    // Utilities for testing media components (including ExoPlayer components) via Robolectric
+    implementation("androidx.media3:media3-test-utils-robolectric:$media3Version")
+
+    // Common functionality for media database components
+    implementation("androidx.media3:media3-database:$media3Version")
+    // Common functionality for media decoders
+    implementation("androidx.media3:media3-decoder:$media3Version")
+    // Common functionality for loading data
+    implementation("androidx.media3:media3-datasource:$media3Version")
+    // Common functionality used across multiple media libraries
+    implementation("androidx.media3:media3-common:$media3Version")
 }

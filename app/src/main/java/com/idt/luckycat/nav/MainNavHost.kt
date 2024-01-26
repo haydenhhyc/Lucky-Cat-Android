@@ -7,6 +7,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.idt.luckycat.camera.ui.CameraScreen
 import com.idt.luckycat.ui.screen.ChatScreen
 import com.idt.luckycat.ui.screen.ConnectScreen
 
@@ -38,6 +39,13 @@ fun MainNavHost(navController: NavHostController, modifier: Modifier = Modifier)
                     navController.popBackStack("connect", inclusive = false)
                 }
             )
+        }
+
+        composable(
+            route ="camera",
+
+        ) {
+            CameraScreen()
         }
     }
 }
