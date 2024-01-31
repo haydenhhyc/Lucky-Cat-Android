@@ -15,7 +15,7 @@ android {
 
     defaultConfig {
         applicationId = "com.idt.luckycat"
-        minSdk = 29
+        minSdk = 26
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -176,4 +176,7 @@ dependencies {
     implementation("androidx.media3:media3-datasource:$media3Version")
     // Common functionality used across multiple media libraries
     implementation("androidx.media3:media3-common:$media3Version")
+
+    // Google ML-Kit for face detection
+    implementation ("com.google.mlkit:face-detection:16.1.5")
 }

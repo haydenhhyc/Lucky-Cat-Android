@@ -8,8 +8,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.idt.luckycat.camera.ui.CameraScreen
+import com.idt.luckycat.camera.ui.CameraUiState
 import com.idt.luckycat.ui.screen.ChatScreen
 import com.idt.luckycat.ui.screen.ConnectScreen
+import com.idt.luckycat.ui.screen.HomeScreen
+import com.idt.luckycat.ui.viewmodel.HomeUiState
 
 
 @Composable
@@ -21,37 +24,67 @@ fun MainNavHost(navController: NavHostController, modifier: Modifier = Modifier)
     ) {
         composable("connect") {
             ConnectScreen(
-                navigateToChat = { host, port ->
-                    navController.navigateToChat(host, port)
+                navigateToHome = { host ->
+                    navController.navigate("home/$host") { launchSingleTop = true }
                 }
             )
         }
 
         composable(
-            route = "chat/{host}/{port}",
+            route = "home/{host}",
+            arguments = listOf(
+                navArgument("host") { type = NavType.StringType })
+        ) { entry ->
+            val host = entry.arguments?.getString("host") ?: throw IllegalStateException()
+
+            HomeScreen(
+                uiState = HomeUiState(host = host),
+                navigateBack = {
+                    if(navController.currentBackStackEntry == entry) {
+                        navController.popBackStack()
+                    }
+                },
+                navigateToChat = {
+                    navController.navigate("chat/$host") { launchSingleTop = true }
+                },
+
+                navigateToCamera = {
+                    navController.navigate("camera/$host") { launchSingleTop = true }
+                },
+            )
+        }
+
+        composable(
+            route = "chat/{host}",
             arguments = listOf(
                 navArgument("host") { type = NavType.StringType },
-                navArgument("port") { type = NavType.IntType }
             )
-        ) {
+        ) {entry ->
             ChatScreen(
                 navigateBack = {
-                    navController.popBackStack("connect", inclusive = false)
+                    if(navController.currentBackStackEntry == entry) {
+                        navController.popBackStack()
+                    }
                 }
             )
         }
 
         composable(
-            route ="camera",
+            route = "camera/{host}",
+            arguments = listOf(
+                navArgument("host") { type = NavType.StringType }
+            )
+        ) {entry ->
+            val host = entry.arguments?.getString("host") ?: throw IllegalStateException()
 
-        ) {
-            CameraScreen()
+            CameraScreen(
+                uiState = CameraUiState(host = host),
+                navigateBack = {
+                    if(navController.currentBackStackEntry == entry) {
+                        navController.popBackStack()
+                    }
+                }
+            )
         }
-    }
-}
-
-fun NavHostController.navigateToChat(host: String, port: Int) {
-    navigate("Chat/$host/$port") {
-        launchSingleTop = true
     }
 }

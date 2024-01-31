@@ -39,12 +39,10 @@ class ChatViewModel(
     }
 
     private val host: String = checkNotNull(savedStateHandle["host"])
-    private val port: Int = checkNotNull(savedStateHandle["port"])
 
     private val _uiState = MutableStateFlow(
         ChatUiState(
             host = host,
-            port = port,
         )
     )
     val uiState = _uiState.asStateFlow()
@@ -71,7 +69,7 @@ class ChatViewModel(
 
         return Retrofit.Builder()
             .client(client)
-            .baseUrl("http://${host}:${port}")
+            .baseUrl("http://${host}:3000")
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(RobotApiService::class.java)
@@ -155,10 +153,11 @@ class ChatViewModel(
             }
             userInput = result
         }
-//        if(userInput.isBlank()) {
-//            _uiState.update { it.copy(chatbotState = ChatbotState.READY) }
-//            return@withContext
-//        }
+        if(userInput.isBlank()) {
+            _uiState.update { it.copy(chatbotState = ChatbotState.READY) }
+            return@withContext
+        }
+
         Log.d(TAG, "userInput = $userInput")
 
         // Process
@@ -208,11 +207,10 @@ class ChatViewModel(
 
 data class ChatUiState(
     val host: String = "",
-    val port: Int = 0,
     val chatbotState: ChatbotState = ChatbotState.READY,
     val userInput: String = "",
 ) {
-    val title = "$host:$port"
+    val title = "Chatbot - $host"
     val talkButtonEnabled = (chatbotState == ChatbotState.READY)
 }
 

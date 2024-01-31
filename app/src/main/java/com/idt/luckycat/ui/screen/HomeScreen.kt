@@ -1,6 +1,5 @@
 package com.idt.luckycat.ui.screen
 
-import android.content.res.Configuration.UI_MODE_NIGHT_YES
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -19,84 +18,51 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.idt.luckycat.ui.theme.LuckyCatAndroidTheme
-import com.idt.luckycat.ui.viewmodel.ChatUiState
-import com.idt.luckycat.ui.viewmodel.ChatViewModel
-
-@Composable
-fun ChatScreen(
-    viewModel: ChatViewModel = viewModel(),
-    navigateBack: () -> Unit,
-) {
-    val uiState by viewModel.uiState.collectAsState()
-    ChatScreenContent(
-        uiState = uiState,
-        onGetStatus = { viewModel.getRobotStatus() },
-        onTalk = { viewModel.onTalk() },
-        navigateBack = navigateBack,
-        onReset = { viewModel.resetRobotStatus() }
-    )
-}
+import com.idt.luckycat.ui.viewmodel.HomeUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreenContent(
-    uiState: ChatUiState,
-    onGetStatus: () -> Unit = {},
-    onTalk: () -> Unit = {},
+fun HomeScreen(
+    uiState: HomeUiState = HomeUiState(),
     navigateBack: () -> Unit = {},
-    onReset: () -> Unit = {},
+    navigateToCamera: () -> Unit = {},
+    navigateToChat: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text(text = uiState.title) },
+                title = { Text("Home - ${uiState.host}") },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.primary
                 ),
                 navigationIcon = {
                     IconButton(onClick = { navigateBack() }) {
-                        Icon(
-                            imageVector = Icons.Filled.ArrowBack,
-                            contentDescription = "back"
-                        )
+                        Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "back")
                     }
-                })
+                }
+            )
         }
     ) { innerPadding ->
         Column(
-            modifier = Modifier
+            Modifier
                 .padding(innerPadding)
                 .fillMaxSize(),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(onClick = { onGetStatus() }) {
-                Text("GET STATUS")
+            Button(onClick = { navigateToChat() }) {
+                Text("TO CHAT")
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-            Button(
-                enabled = uiState.talkButtonEnabled,
-                onClick = { onTalk() }
-            ) {
-                Text("TALK!")
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(
-                onClick = { onReset() }
-            ) {
-                Text("RESET")
+            Button(onClick = { navigateToCamera() }) {
+                Text("TO CAMERA")
             }
         }
     }
@@ -104,24 +70,8 @@ fun ChatScreenContent(
 
 @Preview
 @Composable
-private fun ChatScreenPreview() {
+private fun HomeScreenPreview() {
     LuckyCatAndroidTheme {
-        ChatScreenContent(
-            uiState = ChatUiState(
-                host = "192.168.0.1",
-            )
-        )
-    }
-}
-
-@Preview(uiMode = UI_MODE_NIGHT_YES)
-@Composable
-private fun ChatScreenPreviewNight() {
-    LuckyCatAndroidTheme {
-        ChatScreenContent(
-            uiState = ChatUiState(
-                host = "192.168.0.1",
-            )
-        )
+        HomeScreen()
     }
 }

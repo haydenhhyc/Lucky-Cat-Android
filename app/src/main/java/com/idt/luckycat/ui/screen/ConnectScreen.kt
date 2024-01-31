@@ -31,18 +31,17 @@ import com.idt.luckycat.ui.viewmodel.ConnectViewModel
 @Composable
 fun ConnectScreen(
     viewModel: ConnectViewModel = viewModel(),
-    navigateToChat: (String, Int) -> Unit,
+    navigateToHome: (String) -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     ConnectScreenContent(
         uiState = uiState,
         onHostInput = { viewModel.onHostInput(it) },
-        onPortInput = { viewModel.onPortInput(it) },
         onConnect = {
             viewModel.onConnect()
 
             try {
-                navigateToChat(uiState.hostInput, uiState.portInput.toInt())
+                navigateToHome(uiState.hostInput)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -55,7 +54,6 @@ fun ConnectScreen(
 fun ConnectScreenContent(
     uiState: ConnectUiState,
     onHostInput: (String) -> Unit = {},
-    onPortInput: (String) -> Unit = {},
     onConnect: () -> Unit = {},
     onClear: () -> Unit = {},
 ) {
@@ -74,19 +72,6 @@ fun ConnectScreenContent(
                     keyboardType = KeyboardType.Number
                 ),
                 label = { Text(text = "Host IP") }
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            TextField(
-                value = uiState.portInput,
-                onValueChange = onPortInput,
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                keyboardOptions = KeyboardOptions.Default.copy(
-                    keyboardType = KeyboardType.Number
-                ),
-                label = { Text(text = "Port") }
             )
 
             Spacer(modifier = Modifier.height(24.dp))

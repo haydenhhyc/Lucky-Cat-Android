@@ -15,15 +15,9 @@ class ConnectViewModel : ViewModel() {
         }
     }
 
-    fun onPortInput(value: String) {
-        _uiState.update {
-            it.copy(portInput = value)
-        }
-    }
-
     fun onClear() {
         _uiState.update {
-            it.copy(hostInput = "", portInput = "")
+            it.copy(hostInput = "")
         }
     }
 
@@ -34,7 +28,6 @@ class ConnectViewModel : ViewModel() {
 
 data class ConnectUiState(
     val hostInput: String = "",
-    val portInput: String = "",
 ) {
-    val connectButtonEnabled: Boolean = (hostInput.isNotEmpty() && portInput.isNotEmpty())
+    val connectButtonEnabled: Boolean = (hostInput.isNotEmpty())
 }
