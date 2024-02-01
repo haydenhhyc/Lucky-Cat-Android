@@ -2,8 +2,10 @@ package com.idt.luckycat.camera.ui
 
 import android.graphics.Bitmap
 import android.media.MediaFormat
+import android.util.Log
 import android.view.TextureView
 import androidx.annotation.OptIn
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -22,12 +24,20 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
@@ -46,7 +56,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlin.system.measureNanoTime
+import okhttp3.internal.closeQuietly
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
+import kotlin.system.measureTimeMillis
 
 const val TAG = "CameraScreen"
 
@@ -68,8 +81,12 @@ fun CameraScreen(
         FaceDetection.getClient(options)
     }
 
-    var faces = remember(detector) {
+    val faces = remember(detector) {
         mutableStateOf(listOf<Face>())
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { detector.closeQuietly() }
     }
 
     CameraScreenContent(
@@ -77,18 +94,23 @@ fun CameraScreen(
         navigateBack = navigateBack,
         onFrame = { bitmap ->
             val image = InputImage.fromBitmap(bitmap, 0)
-            val time = measureNanoTime {
-                detector.process(image)
-                    .addOnSuccessListener {
-                        Log.d(TAG, "Detection Success - faces : ${it.size}")
-                        faces.value = it
-                    }
-                    .addOnFailureListener { e ->
-                        Log.e(TAG, "Detection Failed")
-                        e.printStackTrace()
-                    }
+            val time = measureTimeMillis {
+                faces.value = suspendCoroutine { continuation ->
+                    detector.process(image)
+                        .addOnSuccessListener {
+                            Log.d(TAG, "Detection Success - faces : ${it.size}")
+                            faces.value = it
+                            continuation.resume(it)
+                        }
+                        .addOnFailureListener { e ->
+                            Log.e(TAG, "Detection Failed")
+                            e.printStackTrace()
+                            continuation.resume(emptyList())
+                        }
+                }
             }
-            Log.d(TAG, "Detection time taken: $time ns")
+
+            Log.d(TAG, "Detection time taken: $time ms")
         },
         overlay = {
             val textMeasurer = rememberTextMeasurer()
@@ -144,7 +166,7 @@ fun CameraScreen(
 fun CameraScreenContent(
     uiState: CameraUiState,
     navigateBack: () -> Unit,
-    onFrame: (Bitmap) -> Unit = {},
+    onFrame: suspend (Bitmap) -> Unit = {},
     overlay: @Composable BoxScope.() -> Unit = {},
 ) {
     Scaffold(
@@ -174,51 +196,67 @@ fun CameraScreenContent(
                     .width(640.dp)
                     .height(480.dp)
             ) {
+                val context = LocalContext.current
+                val player = remember {
+                    val loadControl = DefaultLoadControl.Builder()
+                        .setBufferDurationsMs(
+                            100,
+                            2_000,
+                            100,
+                            100
+                        )
+                        .build()
+
+                    ExoPlayer.Builder(context)
+                        .setLoadControl(loadControl)
+                        .build()
+                }
+
+                DisposableEffect(Unit) {
+                    onDispose { player.release() }
+                }
+
                 AndroidView(
-                    factory = { context ->
-                        val tv = TextureView(context)
-                        val loadControl = DefaultLoadControl.Builder()
-                            .setBufferDurationsMs(
-                                100,
-                                2_000,
-                                100,
-                                100
-                            )
-                            .build()
+                    factory = { avContext ->
+                        val tv = TextureView(avContext)
+                        player.apply {
 
-                        val rtspUrl = getRtspUrl(uiState.host)
-                        val player = ExoPlayer.Builder(context)
-                            .setLoadControl(loadControl)
-                            .build()
-                            .apply {
-                                setVideoFrameMetadataListener(object : VideoFrameMetadataListener {
-                                    private val mutex = Mutex()
-                                    override fun onVideoFrameAboutToBeRendered(
-                                        presentationTimeUs: Long,
-                                        releaseTimeNs: Long,
-                                        format: Format,
-                                        mediaFormat: MediaFormat?,
-                                    ) {
-                                        scope.launch(Dispatchers.Default) {
-                                            if (mutex.isLocked) {
-                                                return@launch
-                                            }
+                            setVideoFrameMetadataListener(object : VideoFrameMetadataListener {
+                                private val mutex = Mutex()
+                                override fun onVideoFrameAboutToBeRendered(
+                                    presentationTimeUs: Long,
+                                    releaseTimeNs: Long,
+                                    format: Format,
+                                    mediaFormat: MediaFormat?,
+                                ) {
+                                    if (mutex.isLocked) {
+                                        return
+                                    }
 
-                                            mutex.withLock {
-                                                val bitmap = tv.bitmap ?: return@withLock
-                                                onFrame(bitmap)
+                                    scope.launch(Dispatchers.Default) {
+                                        mutex.withLock {
+                                            val bitmap = tv.bitmap ?: return@withLock
+                                            onFrame(bitmap)
+
+                                            // in case the callee doesn't recycle the bitmap
+                                            if(!bitmap.isRecycled) {
+                                                bitmap.recycle()
                                             }
                                         }
                                     }
-                                })
-                                setVideoTextureView(tv)
-                                setMediaItem(MediaItem.fromUri(rtspUrl))
-                                prepare()
-                                play()
-                            }
+                                }
+                            })
 
-                        player.setVideoTextureView(tv)
-                        tv
+                            setVideoTextureView(tv)
+
+                            val rtspUrl = getRtspUrl(uiState.host)
+                            setMediaItem(MediaItem.fromUri(rtspUrl))
+
+                            prepare()
+                            play()
+                        }
+
+                        return@AndroidView tv
                     }
                 )
 
