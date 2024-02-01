@@ -7,12 +7,12 @@ import android.view.TextureView
 import androidx.annotation.OptIn
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -63,7 +63,8 @@ import kotlin.system.measureTimeMillis
 
 const val TAG = "CameraScreen"
 
-private fun getRtspUrl(host: String) = "rtsp://$host:8554/camera"
+private fun cameraUrl(host: String) = "rtsp://$host:8554/camera"
+private fun thermalUrl(host: String) = "rtsp://$host:8554/thermal"
 
 @Composable
 fun CameraScreen(
@@ -77,29 +78,39 @@ fun CameraScreen(
             .build()
     }
 
-    val detector = remember(options) {
+    val detectorCamera = remember(options) {
         FaceDetection.getClient(options)
     }
 
-    val faces = remember(detector) {
+    val facesCamera = remember(detectorCamera) {
+        mutableStateOf(listOf<Face>())
+    }
+
+    val detectorThermal = remember(options) {
+        FaceDetection.getClient(options)
+    }
+
+    val facesThermal = remember(detectorCamera) {
         mutableStateOf(listOf<Face>())
     }
 
     DisposableEffect(Unit) {
-        onDispose { detector.closeQuietly() }
+        onDispose {
+            detectorCamera.closeQuietly()
+            detectorThermal.closeQuietly()
+        }
     }
 
     CameraScreenContent(
         uiState = uiState,
         navigateBack = navigateBack,
-        onFrame = { bitmap ->
+        onFrameThermal = { bitmap ->
             val image = InputImage.fromBitmap(bitmap, 0)
             val time = measureTimeMillis {
-                faces.value = suspendCoroutine { continuation ->
-                    detector.process(image)
+                facesThermal.value = suspendCoroutine { continuation ->
+                    detectorThermal.process(image)
                         .addOnSuccessListener {
                             Log.d(TAG, "Detection Success - faces : ${it.size}")
-                            faces.value = it
                             continuation.resume(it)
                         }
                         .addOnFailureListener { e ->
@@ -112,14 +123,78 @@ fun CameraScreen(
 
             Log.d(TAG, "Detection time taken: $time ms")
         },
-        overlay = {
+        overlayThermal = {
             val textMeasurer = rememberTextMeasurer()
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Transparent)
             ) {
-                faces.value.forEach { face ->
+                facesThermal.value.forEach { face ->
+                    val box = face.boundingBox
+
+                    drawRect(
+                        Color.Green,
+                        topLeft = Offset(box.left.toFloat(), box.top.toFloat()),
+                        size = Size(
+                            width = (box.right - box.left).toFloat(),
+                            height = (box.bottom - box.top).toFloat()
+                        ),
+                        style = Stroke(width = 1f)
+                    )
+
+                    face.smilingProbability?.let { prob ->
+                        Log.d(TAG, "smile: ${face.smilingProbability}")
+                        val isSmiling = prob > 0.5f
+
+                        try {
+                            translate(
+                                left = box.left.toFloat(),
+                                top = box.bottom.toFloat()
+                            ) {
+                                drawText(
+                                    textMeasurer,
+                                    text = if (isSmiling) "HAPPY" else "SADGE",
+                                    style = TextStyle.Default.copy(
+                                        color = if (isSmiling) Color.Green else Color.Red,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                )
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                }
+            }
+        },
+        onFrameCamera = { bitmap ->
+            val image = InputImage.fromBitmap(bitmap, 0)
+            val time = measureTimeMillis {
+                facesCamera.value = suspendCoroutine { continuation ->
+                    detectorCamera.process(image)
+                        .addOnSuccessListener {
+                            Log.d(TAG, "Detection Success - faces : ${it.size}")
+                            continuation.resume(it)
+                        }
+                        .addOnFailureListener { e ->
+                            Log.e(TAG, "Detection Failed")
+                            e.printStackTrace()
+                            continuation.resume(emptyList())
+                        }
+                }
+            }
+
+            Log.d(TAG, "Detection time taken: $time ms")
+        },
+        overlayCamera = {
+            val textMeasurer = rememberTextMeasurer()
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Transparent)
+            ) {
+                facesCamera.value.forEach { face ->
                     val box = face.boundingBox
 
                     drawRect(
@@ -166,8 +241,10 @@ fun CameraScreen(
 fun CameraScreenContent(
     uiState: CameraUiState,
     navigateBack: () -> Unit,
-    onFrame: suspend (Bitmap) -> Unit = {},
-    overlay: @Composable BoxScope.() -> Unit = {},
+    onFrameThermal: suspend (Bitmap) -> Unit = {},
+    overlayThermal: @Composable BoxScope.() -> Unit = {},
+    onFrameCamera: suspend (Bitmap) -> Unit = {},
+    overlayCamera: @Composable BoxScope.() -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -183,86 +260,102 @@ fun CameraScreenContent(
                 })
         }
     ) { innerPadding ->
-        val scope = rememberCoroutineScope()
-
-        Box(
+        Row(
             Modifier
                 .padding(innerPadding)
                 .fillMaxSize(),
-            Alignment.Center
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .width(640.dp)
-                    .height(480.dp)
-            ) {
-                val context = LocalContext.current
-                val player = remember {
-                    val loadControl = DefaultLoadControl.Builder()
-                        .setBufferDurationsMs(
-                            100,
-                            2_000,
-                            100,
-                            100
-                        )
-                        .build()
+            RtspCamera(
+                Modifier.weight(1f),
+                onFrame = onFrameCamera,
+                overlay = overlayCamera,
+                uri = cameraUrl(uiState.host)
+            )
+            RtspCamera(
+                Modifier.weight(1f),
+                onFrame = onFrameThermal,
+                overlay = overlayThermal,
+                uri = thermalUrl(uiState.host)
+            )
+        }
+    }
+}
 
-                    ExoPlayer.Builder(context)
-                        .setLoadControl(loadControl)
-                        .build()
-                }
+@OptIn(UnstableApi::class)
+@Composable
+fun RtspCamera(
+    modifier: Modifier = Modifier,
+    onFrame: suspend (Bitmap) -> Unit = {},
+    overlay: @Composable BoxScope.() -> Unit = {},
+    uri: String
+) {
+    val scope = rememberCoroutineScope()
 
-                DisposableEffect(Unit) {
-                    onDispose { player.release() }
-                }
+    Box(modifier = modifier, Alignment.Center) {
+        val context = LocalContext.current
+        val player = remember {
+            val loadControl = DefaultLoadControl.Builder()
+                .setBufferDurationsMs(
+                    100,
+                    2_000,
+                    100,
+                    100
+                )
+                .build()
 
-                AndroidView(
-                    factory = { avContext ->
-                        val tv = TextureView(avContext)
-                        player.apply {
+            ExoPlayer.Builder(context)
+                .setLoadControl(loadControl)
+                .build()
+        }
 
-                            setVideoFrameMetadataListener(object : VideoFrameMetadataListener {
-                                private val mutex = Mutex()
-                                override fun onVideoFrameAboutToBeRendered(
-                                    presentationTimeUs: Long,
-                                    releaseTimeNs: Long,
-                                    format: Format,
-                                    mediaFormat: MediaFormat?,
-                                ) {
-                                    if (mutex.isLocked) {
-                                        return
-                                    }
+        DisposableEffect(Unit) {
+            onDispose { player.release() }
+        }
 
-                                    scope.launch(Dispatchers.Default) {
-                                        mutex.withLock {
-                                            val bitmap = tv.bitmap ?: return@withLock
-                                            onFrame(bitmap)
+        AndroidView(
+            factory = { avContext ->
+                val tv = TextureView(avContext)
+                player.apply {
 
-                                            // in case the callee doesn't recycle the bitmap
-                                            if(!bitmap.isRecycled) {
-                                                bitmap.recycle()
-                                            }
-                                        }
+                    setVideoFrameMetadataListener(object : VideoFrameMetadataListener {
+                        private val mutex = Mutex()
+                        override fun onVideoFrameAboutToBeRendered(
+                            presentationTimeUs: Long,
+                            releaseTimeNs: Long,
+                            format: Format,
+                            mediaFormat: MediaFormat?,
+                        ) {
+                            if (mutex.isLocked) {
+                                return
+                            }
+
+                            scope.launch(Dispatchers.Default) {
+                                mutex.withLock {
+                                    val bitmap = tv.bitmap ?: return@withLock
+                                    onFrame(bitmap)
+
+                                    // in case the callee doesn't recycle the bitmap
+                                    if (!bitmap.isRecycled) {
+                                        bitmap.recycle()
                                     }
                                 }
-                            })
-
-                            setVideoTextureView(tv)
-
-                            val rtspUrl = getRtspUrl(uiState.host)
-                            setMediaItem(MediaItem.fromUri(rtspUrl))
-
-                            prepare()
-                            play()
+                            }
                         }
+                    })
 
-                        return@AndroidView tv
-                    }
-                )
+                    setVideoTextureView(tv)
+                    setMediaItem(MediaItem.fromUri(uri))
 
-                overlay()
+                    prepare()
+                    play()
+                }
+
+                return@AndroidView tv
             }
-        }
+        )
+        overlay()
     }
 }
 
