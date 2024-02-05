@@ -10,7 +10,7 @@ import androidx.navigation.navArgument
 import com.idt.luckycat.camera.ui.CameraScreen
 import com.idt.luckycat.camera.ui.CameraUiState
 import com.idt.luckycat.ui.screen.ChatScreen
-import com.idt.luckycat.ui.screen.ConnectScreen
+import com.idt.luckycat.connect.ui.ConnectScreen
 import com.idt.luckycat.ui.screen.HomeScreen
 import com.idt.luckycat.ui.viewmodel.HomeUiState
 

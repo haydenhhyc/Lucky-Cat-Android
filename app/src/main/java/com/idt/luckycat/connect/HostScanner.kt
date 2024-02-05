@@ -1,4 +1,4 @@
-package com.idt.luckycat.network
+package com.idt.luckycat.connect
 
 import android.content.Context
 import android.net.wifi.WifiManager
