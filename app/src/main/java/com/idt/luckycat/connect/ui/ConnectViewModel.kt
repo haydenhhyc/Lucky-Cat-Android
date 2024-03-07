@@ -28,7 +28,7 @@ class ConnectViewModel(app: Application) : AndroidViewModel(app) {
         scanJob?.cancel()
         scanJob = viewModelScope.launch {
             _uiState.update { it.copy(isScanning = true) }
-            scanner.findHosts(context, 51234)
+            scanner.findHosts(context, 18458)
 
             _uiState.update { it.copy(isScanning = false) }
         }
