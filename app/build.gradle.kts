@@ -163,11 +163,6 @@ dependencies {
     // For extracting data from media containers
     implementation("androidx.media3:media3-extractor:$media3Version")
 
-    // Utilities for testing media components (including ExoPlayer components)
-    implementation("androidx.media3:media3-test-utils:$media3Version")
-    // Utilities for testing media components (including ExoPlayer components) via Robolectric
-    implementation("androidx.media3:media3-test-utils-robolectric:$media3Version")
-
     // Common functionality for media database components
     implementation("androidx.media3:media3-database:$media3Version")
     // Common functionality for media decoders
