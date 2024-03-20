@@ -151,7 +151,7 @@ class ChatViewModel(
         // Speak
         robotApiService.sendMessage(
             text = reply,
-            language = "en-US"
+            language = "yue-HK"
         )
         _uiState.update {
             it.copy(chatbotState = ChatbotState.SPEAKING)
