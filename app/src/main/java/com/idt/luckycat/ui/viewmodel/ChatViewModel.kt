@@ -7,19 +7,18 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.idt.hkcs.conversation.stt.STT
 import com.idt.luckycat.BuildConfig
+import com.idt.luckycat.api.Response
 import com.idt.luckycat.api.RobotApiService
 import com.idt.luckycat.api.ServerApiService
-import com.idt.luckycat.api.SpeakTextRequest
 import com.idt.luckycat.speech.chatbot.ChatGPTChatModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import okhttp3.Credentials
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -63,16 +62,7 @@ class ChatViewModel(
     }
 
     private fun initRobotApiService(): RobotApiService {
-        val client = OkHttpClient.Builder()
-            .addInterceptor(HttpLoggingInterceptor().setLevel(Level.BASIC))
-            .build()
-
-        return Retrofit.Builder()
-            .client(client)
-            .baseUrl("http://${host}:3000")
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(RobotApiService::class.java)
+        return RobotApiService(host)
     }
 
     private fun initServerApiService(): ServerApiService {
@@ -115,17 +105,6 @@ class ChatViewModel(
         return stt
     }
 
-    fun getRobotStatus() {
-        viewModelScope.launch(Dispatchers.IO) {
-            // TODO
-            try {
-                robotApiService.getRobotStatus()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
-
     fun onTalk() {
         if (stt == null) {
             return
@@ -153,7 +132,7 @@ class ChatViewModel(
             }
             userInput = result
         }
-        if(userInput.isBlank()) {
+        if (userInput.isBlank()) {
             _uiState.update { it.copy(chatbotState = ChatbotState.READY) }
             return@withContext
         }
@@ -170,25 +149,39 @@ class ChatViewModel(
         Log.d(TAG, "reply = $reply")
 
         // Speak
-        robotApiService.speakText(
-            SpeakTextRequest(
-                text = reply,
-                lang = "yue"
-            )
+        robotApiService.sendMessage(
+            text = reply,
+            language = "en-US"
         )
         _uiState.update {
             it.copy(chatbotState = ChatbotState.SPEAKING)
         }
 
         // wait for speech finish
-        withTimeout(30_000) {
-            while (isActive) {
-                if (robotApiService.getRobotStatus().status == 0) {
-                    break
-                }
-                delay(1000)
+        robotApiService.getMessageFlow()
+            .filterIsInstance<Response.TTSResponse>()
+            .transformWhile { response ->
+                emit(response)
+
+                // collect flow until get we a TTSResponse and its state == "end"
+                response.state != "end"
             }
-        }
+            .collect { response ->
+                when (response.state) {
+                    "start" -> {
+                        _uiState.update {
+                            it.copy(
+                                chatbotState = ChatbotState.SPEAKING,
+                                chatbotReply = reply
+                            )
+                        }
+                    }
+
+                    "end" -> {
+                        _uiState.update { it.copy(chatbotState = ChatbotState.READY) }
+                    }
+                }
+            }
 
         // Done
         _uiState.update { it.copy(chatbotState = ChatbotState.READY) }
@@ -197,11 +190,15 @@ class ChatViewModel(
     fun resetRobotStatus() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                robotApiService.resetStatus()
+                // TODO clear robot status
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
+    }
+
+    fun onExit() {
+        robotApiService.disconnect()
     }
 }
 
@@ -209,6 +206,7 @@ data class ChatUiState(
     val host: String = "",
     val chatbotState: ChatbotState = ChatbotState.READY,
     val userInput: String = "",
+    val chatbotReply: String = "",
 ) {
     val title = "Chatbot - $host"
     val talkButtonEnabled = (chatbotState == ChatbotState.READY)
