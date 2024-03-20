@@ -41,6 +41,7 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
@@ -293,7 +294,7 @@ fun RtspCamera(
 ) {
     val scope = rememberCoroutineScope()
 
-    Box(modifier = modifier, Alignment.Center) {
+    Box(modifier = modifier.background(Color.Black), Alignment.Center) {
         val context = LocalContext.current
         val player = remember {
             val loadControl = DefaultLoadControl.Builder()
@@ -313,6 +314,14 @@ fun RtspCamera(
         DisposableEffect(Unit) {
             onDispose { player.release() }
         }
+
+        Text(
+            modifier = Modifier.align(Alignment.Center),
+            text = "Loading...",
+            fontSize = 48.sp,
+            color = Color.White,
+            fontWeight = FontWeight.SemiBold
+        )
 
         AndroidView(
             factory = { avContext ->
